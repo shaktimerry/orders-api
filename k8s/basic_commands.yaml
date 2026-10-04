@@ -1,0 +1,107 @@
+AKS Cluster Setup & Context Management
+********************************************
+az aks get-credentials --resource-group <rg-name> --name <cluster-name> > Fetch and merge kubeconfig credentials for an Azure Kubernetes Service (AKS) cluster into your local configuration.
+kubectl config get-contexts > Display all available cluster contexts in your local kubeconfig file.
+kubectl config current-context > Show the currently active cluster context.
+kubectl config use-context <context-name> > Switch active terminal context to a different Kubernetes cluster.
+kubectl config set-context --current --namespace=<namespace> > Set a default namespace for all subsequent commands in the current context.
+kubectl cluster-info > Display master node and core service control plane endpoints.
+kubectl version --short > Display client and server Kubernetes API version details.
+kubectl get nodes -o wide > List all worker nodes with node internal/external IPs, OS, kernel, and container runtime versions.
+
+Pods & Containers
+**************************************
+kubectl get pods > List all running pods in the current namespace.
+kubectl get pods -A > List all pods across every namespace in the entire cluster.
+kubectl get pods -o wide > Display pods with node assignments, pod IP addresses, and readiness status.
+kubectl get pods -w > Stream real-time status changes of pods in the current terminal.
+kubectl get pods --field-selector status.phase=Failed > Filter and list only pods currently in a Failed state.
+kubectl get pods -l app=<label-value> > List pods matching a specific label selector.
+kubectl describe pod <pod-name> > Inspect detailed events, status history, volume mounts, and container states for a specific pod.
+kubectl get pod <pod-name> -o yaml > Output the complete YAML manifest and status section of a running pod.
+kubectl delete pod <pod-name> > Terminate a pod and allow its managing controller to recreate it.
+kubectl delete pod <pod-name> --grace-period=0 --force > Forcefully delete a stuck or unresponsive pod immediately.
+
+Deployments & Workloads
+*********************************************
+kubectl get deployments,rs,sts,ds,jobs,cronjobs -n <namespace> > View all workload controllers (Deployments, ReplicaSets, StatefulSets, DaemonSets, Jobs, CronJobs) in a namespace.
+kubectl describe deployment <deployment-name> > View rollout strategy, replica counts, conditions, labels, and event logs for a deployment.
+kubectl scale deployment <deployment-name> --replicas=<count> > Manually adjust the number of running replicas for a deployment.
+kubectl rollout status deployment/<deployment-name> > Monitor the real-time progress of a rolling deployment update.
+kubectl rollout history deployment/<deployment-name> > Inspect historical revision releases of a deployment.
+kubectl rollout undo deployment/<deployment-name> > Roll back a deployment to its previous revision state.
+kubectl rollout undo deployment/<deployment-name> --to-revision=<number> > Roll back a deployment to a specific historical revision number.
+kubectl rollout restart deployment/<deployment-name> > Trigger a zero-downtime rolling restart of all pods managed by a deployment.
+kubectl get hpa > Inspect Horizontal Pod Autoscaler metrics, target thresholds, min/max limits, and current pod counts.
+
+Services, Networking & Ingress
+************************************
+kubectl get svc > List all services, showing ClusterIP, External IP (LoadBalancer), exposed ports, and types.
+kubectl get svc -A > List all services cluster-wide to audit external and internal endpoints.
+kubectl describe svc <service-name> > Inspect service target ports, selectors, and linked backend endpoints.
+kubectl get endpoints <service-name> > View the actual pod IP addresses attached to a specific service.
+kubectl get ingress > List all ingress rules, assigned external load balancer IPs, and hostnames.
+kubectl describe ingress <ingress-name> > Inspect host routing configurations, TLS settings, path mappings, and backend targets.
+kubectl get networkpolicies > List NetworkPolicies controlling traffic ingress and egress between pods.
+kubectl describe networkpolicy <policy-name> > View detailed firewall rules restricting pod network communication.
+
+Storage & Persistence (PV, PVC, StorageClasses)
+*******************************************************
+kubectl get pv > Display all persistent volumes provisioned across the cluster and their claim bindings.
+kubectl get pvc > List persistent volume claims in the current namespace along with storage sizes and statuses.
+kubectl describe pvc <pvc-name> > Troubleshoot PVC binding issues, access modes, storage class mappings, and provisioning events.
+kubectl get sc > Display available StorageClasses (e.g., managed-csi, azurefile-csi) in the AKS cluster.
+kubectl describe sc <storage-class-name> > Check volume provisioner types, reclaim policies, and dynamic binding modes.
+
+ConfigMaps & Secrets
+*******************************************************
+kubectl get configmaps > List all ConfigMaps stored in the current namespace.
+kubectl describe cm <configmap-name> > View configuration keys and values saved in a ConfigMap.
+kubectl get secrets > List all Secrets in the current namespace.
+kubectl describe secret <secret-name> > View secret metadata and key names without printing sensitive values.
+kubectl get secret <secret-name> -o jsonpath='{.data}' > Extract all base64-encoded key-value pairs stored inside a secret.
+kubectl get secret <secret-name> -o jsonpath='{.data.<key-name>}' | base64 --decode > Decode a specific base64 secret value into plain text.
+
+Logs & Interactive Debugging
+*******************************************************
+kubectl logs <pod-name> > Retrieve container output logs from a single-container pod.
+kubectl logs <pod-name> -c <container-name> > Retrieve logs from a specific container inside a multi-container pod.
+kubectl logs -f <pod-name> > Tail and continuously stream live logs from a pod.
+kubectl logs <pod-name> --previous > Fetch logs from the previously crashed container instance (crucial for CrashLoopBackOff errors).
+kubectl logs -l app=<label-value> --tail=100 > Retrieve the last 100 log lines from all pods sharing a specific label.
+kubectl exec -it <pod-name> -- /bin/sh > Open an interactive terminal shell inside a running container.
+kubectl exec -it <pod-name> -c <container-name> -- /bin/bash > Open a bash shell inside a specific target container of a multi-container pod.
+kubectl port-forward pod/<pod-name> <local-port>:<pod-port> > Forward local machine traffic to a specific pod port for local testing.
+kubectl port-forward svc/<service-name> <local-port>:<service-port> > Forward local machine traffic directly to a ClusterIP service.
+kubectl get events --sort-by='.metadata.creationTimestamp' > Print cluster events chronologically to trace errors, failures, and rescheduling.
+kubectl get events -n <namespace> --field-selector type=Warning > Filter namespace events to isolate warnings, crash reports, and scheduling failures.
+
+AKS Node & Metric Troubleshooting
+*******************************************************
+kubectl describe node <node-name> > Check node conditions (DiskPressure, MemoryPressure, NetworkUnavailable), taints, and capacity limits.
+kubectl top nodes > Display real-time CPU and Memory consumption per AKS worker node (requires Metrics Server).
+kubectl top pods -n <namespace> --sort-by=memory > Display pod resource usage sorted by highest memory consumption.
+kubectl top pods -n <namespace> --sort-by=cpu > Display pod resource usage sorted by highest CPU consumption.
+kubectl cordon <node-name> > Mark an AKS node as unschedulable to prevent new pods from landing on it.
+kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data > Evict all running pods safely from a node prior to node updates or maintenance.
+kubectl uncordon <node-name> > Re-enable pod scheduling on a previously cordoned node.
+kubectl debug node/<node-name> -it --image=[mcr.microsoft.com/dotnet/runtime-deps:6.0](https://mcr.microsoft.com/dotnet/runtime-deps:6.0) > Launch an interactive elevated privilege debug container directly on the host node root environment.
+kubectl debug pod/<pod-name> -it --image=busybox --target=<container-name> > Attach a temporary ephemeral debug container into a running pod's process namespace.
+
+RBAC, CRDs & API Resources
+*******************************************************
+kubectl get sa > List all ServiceAccounts configured in the current namespace.
+kubectl auth can-i create pods --as=system:serviceaccount:<namespace>:<sa-name> > Validate if a specific ServiceAccount has permission to perform an action.
+kubectl auth can-i <verb> <resource> -n <namespace> > Check if your current active credentials permit a specific action (e.g., delete deployments).
+kubectl get roles,rolebindings,clusterroles,clusterrolebindings > List all local namespace and cluster-wide RBAC mappings.
+kubectl get crd > List all Custom Resource Definitions installed on the cluster.
+kubectl get api-resources > List all supported API resource kinds, apiGroups, shortnames, and namespace scopes.
+
+Resource Deployment & Manifest Management
+*******************************************************
+kubectl apply -f <file.yaml> > Declaratively apply or update resources from a single YAML or JSON file.
+kubectl apply -f <directory>/ > Declaratively apply all YAML specification files inside a directory.
+kubectl diff -f <file.yaml> > Compare live cluster state with local manifest changes before executing an apply.
+kubectl edit <resource-type>/<resource-name> > Open and edit live cluster resource configurations directly in your default terminal text editor.
+kubectl delete -f <file.yaml> > Delete all resources declared in a local manifest file.
+kubectl delete all --all -n <namespace> > Delete all pods, deployments, services, and replica sets within a specified namespace.
