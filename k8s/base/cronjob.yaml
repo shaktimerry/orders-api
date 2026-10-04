@@ -1,0 +1,38 @@
+apiVersion: batch/v1
+kind: CronJob
+
+metadata:
+  name: orders-cleanup
+  namespace: orders-prod
+
+spec:
+
+  schedule: "0 2 * * *"
+
+  concurrencyPolicy: Forbid
+
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+
+  jobTemplate:
+
+    spec:
+
+      backoffLimit: 3
+
+      template:
+
+        spec:
+
+          restartPolicy: OnFailure
+
+          serviceAccountName: orders-api-sa
+
+          containers:
+
+          - name: cleanup
+
+            image: myacr.azurecr.io/orders-api:1.0.25
+
+            command:
+            - /app/cleanup
