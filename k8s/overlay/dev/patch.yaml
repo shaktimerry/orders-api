@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: orders-api
+
+spec:
+
+  replicas: 5
+
+  template:
+
+    spec:
+
+      containers:
+
+      - name: orders-api
+
+        image: myacr.azurecr.io/orders-api:1.0.25
+
+        resources:
+
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+
+          limits:
+            cpu: "2"
+            memory: "2Gi"
