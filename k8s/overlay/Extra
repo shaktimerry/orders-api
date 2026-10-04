@@ -1,1 +1,33 @@
 kubectl apply -k k8s/overlays/prod/
+
+But don't use the same YAML for Dev, QA and Prod
+
+This is where overlays come in.
+
+base/
+   │
+   ├── Deployment
+   ├── Service
+   ├── Ingress
+   └── HPA
+          │
+          ├───────────────┐
+          ▼               ▼
+        dev             qa              prod
+
+For example:
+
+dev
+replicas = 1
+CPU = 100m
+Memory = 256Mi
+
+qa
+replicas = 2
+CPU = 250m
+Memory = 512Mi
+
+prod
+replicas = 3+
+CPU = 250m
+Memory = 512Mi
