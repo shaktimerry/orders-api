@@ -1,0 +1,157 @@
+Basic (Pods, Nodes, & Deployments)
+********************************************
+Q: Why is a Pod stuck in the Pending state?
+A: The Kubernetes scheduler cannot find a node to host the pod. This is usually due to insufficient CPU/memory resources on nodes, unmatched node selectors/taints, or an unprovisioned PersistentVolumeClaim (PVC). Check: kubectl describe pod <pod-name>.
+
+Q: How do I find out why a Pod is in CrashLoopBackOff?
+A: The application inside the container is failing to start or crashing repeatedly. Check the logs of the previous crashed instance: kubectl logs <pod-name> --previous, then check events: kubectl describe pod <pod-name>.
+
+Q: Suppose a Node status is NotReady. How to check?
+A: The kubelet daemon stopped communicating with the API server. Check: kubectl describe node <node-name>. For deeper diagnostics, use the AKS node shell (kubectl debug node/<node-name> -it --image=[mcr.microsoft.com/cbl-mariner/base/core:2.0](https://mcr.microsoft.com/cbl-mariner/base/core:2.0)) and run journalctl -u kubelet.
+
+Q: Why is a Pod showing ImagePullBackOff or ErrImagePull?
+A: The node cannot pull the container image. This implies a typo in the image tag, missing Azure Container Registry (ACR) credentials, or an egress network block. Check the events section at the bottom of kubectl describe pod <pod-name>.
+
+Q: How do I check the real-time resource usage of pods and nodes?
+A: Run kubectl top pods or kubectl top nodes. (Note: This requires the Metrics Server to be running in your cluster).
+
+Q: Suppose I cannot connect to my AKS cluster at all via kubectl. How to check?
+A: Verify your kubeconfig context using kubectl config current-context. If it's stale, refresh your credentials from Azure: az aks get-credentials -g <resource-group> -n <cluster-name>.
+
+Q: Why are my logs not showing up when I run kubectl logs?
+A: The pod might not have started yet (check pod status), or your application is logging to a file instead of standard output (stdout) and standard error (stderr), which Kubernetes requires for log capture.
+
+Q: How do I securely access a pod's shell to test internal connectivity?
+A: Run an interactive exec session: kubectl exec -it <pod-name> -- /bin/sh (or /bin/bash depending on the base image).
+
+Q: Suppose I accidentally deleted a deployment. Can I restore it directly from AKS?
+A: No. AKS does not natively back up Kubernetes objects. You must redeploy from your CI/CD pipeline, GitOps repository, or rely on a third-party backup tool like Velero.
+
+Q: How do I check cluster events across all namespaces for a quick health overview?
+A: Run kubectl get events --all-namespaces --sort-by='.metadata.creationTimestamp'.
+
+Intermediate (Networking, Storage, & Autoscaling)
+*********************************************************
+Q: Why is my LoadBalancer service stuck in Pending?
+A: The Azure cloud provider cannot provision the Public IP or configure the Azure Load Balancer. Run kubectl describe svc <svc-name> and look for errors like cloud-provider rate limiting, restricted NSG rules, or subnet IP exhaustion.
+
+Q: How to troubleshoot an Ingress controller returning 502 Bad Gateway?
+A: The Ingress controller cannot reach the backend pod. Verify the backend service exists, check if endpoints are populated (kubectl get endpoints <svc>), and ensure the pods are listening on the correct target port.
+
+Q: Suppose a PVC is stuck in Pending. Why?
+A: The StorageClass might be missing, or the Azure provisioner failed to create the disk/file share. Check the volume events: kubectl describe pvc <pvc-name>.
+
+Q: How do I test DNS resolution from inside a cluster?
+A: Spin up an ephemeral debug pod and test resolution: kubectl run -it --rm debug --image=[mcr.microsoft.com/cbl-mariner/base/core:2.0](https://mcr.microsoft.com/cbl-mariner/base/core:2.0) -- nslookup <service-name>.
+
+Q: Why is my pod getting an "Access Denied" error when mounting Azure Files?
+A: This is usually a mismatch in storage account access keys, or the Storage Account firewall is blocking the AKS subnet. Verify the secret containing the keys and check the VNet configuration on the storage account.
+
+Q: Suppose nodes in my node pool are not scaling up during high load. How to check?
+A: The Cluster Autoscaler might be failing. Run kubectl get configmap cluster-autoscaler-status -n kube-system -o yaml to read the status and find out exactly why a scale-up event is being ignored or failing.
+
+Q: How do I check if my AKS cluster is running out of IP addresses (Azure CNI)?
+A: In Azure CNI, every pod consumes a VNet IP. Check the VNet/Subnet in the Azure Portal for "Available IPs". Exhaustion prevents new pods and nodes from being scheduled.
+
+Q: Why did my pod randomly get Evicted?
+A: Usually due to Node pressure (running out of memory or disk space). Run kubectl get events and look for the Evicted status, or describe the node to look for DiskPressure or MemoryPressure conditions.
+
+Q: How do I fix "Unauthorized" errors when AKS tries to pull from an ACR?
+A: Ensure the AKS managed identity has the AcrPull role assigned to the target ACR. You can attach it via CLI: az aks update -n <cluster> -g <rg> --attach-acr <acr-name>.
+
+Q: Suppose I deploy a Service but it routes no traffic. Why?
+A: The labels in the Service's selector likely do not perfectly match the labels on your Pods. Compare kubectl get pods --show-labels against your Service YAML.
+
+Q: How to check if Network Policies are blocking pod traffic?
+A: Exec into the source pod and run nc -vz <destination-pod-ip> <port>. If it times out, a Network Policy is likely dropping traffic. Review existing policies: kubectl get networkpolicy -A.
+
+Q: Why does upgrading my AKS cluster fail or time out?
+A: Common culprits are strict Pod Disruption Budgets (PDBs) preventing node draining, deprecated API versions in use, or insufficient IP addresses in the subnet to create the "surge" node. Check the Azure Activity Log for the exact cluster error.
+
+Q: How do I forcefully delete a pod that is stuck in Terminating for hours?
+A: Run kubectl delete pod <pod-name> --grace-period=0 --force. (Use cautiously, as it bypasses graceful application shutdown and volume unmounting).
+
+Q: Suppose a multi-zone AKS cluster has pods failing to mount disks. Why?
+A: Azure Standard/Premium Managed Disks (LRS) are zone-specific. If a pod reschedules to Zone 2 but its existing disk is in Zone 1, the mount fails. Solution: Use Zone-Redundant Storage (ZRS) disks or node selectors.
+
+Q: How do I debug Calico network policies in AKS?
+A: Use the AKS node shell to run calicoctl node status to verify the mesh, and review Calico endpoint logs to see exactly which policy is dropping packets.
+
+Advanced (Identity, CoreDNS, Configuration & Metrics)
+***********************************************************
+Q: Why am I getting OOMKilled on a pod, but the node itself has plenty of free memory?
+A: The pod exceeded its defined resources.limits.memory in the deployment YAML. Kubernetes forcefully kills the container. Check the Last State section in kubectl describe pod <pod-name>.
+
+Q: How do I troubleshoot CoreDNS high CPU usage or crash loops?
+A: CoreDNS might be caught in a DNS forwarding loop, or it is handling too many external queries. Check the logs: kubectl logs -n kube-system -l k8s-app=kube-dns. Also, inspect the coredns-custom ConfigMap for syntax errors.
+
+Q: Suppose Microsoft Entra ID (Azure AD) RBAC is set up, but I get "User cannot list pods". How to check?
+A: Verify the user has the correct Azure Role Assignment (e.g., Azure Kubernetes Service RBAC Reader) scoped to the cluster/namespace, OR check for native Kubernetes RoleBinding objects tying their Entra ID group to a Role.
+
+Q: Why does my Workload Identity authentication fail when talking to Azure Key Vault?
+A: Check for a mismatched Service Account annotation, a missing OIDC issuer URL on the cluster, or verify that the federated identity credential in Azure exactly matches system:serviceaccount:<namespace>:<sa-name>.
+
+Q: How do I troubleshoot SNAT port exhaustion in AKS?
+A: Symptoms include external connections randomly dropping or timing out. Check the Azure Load Balancer metrics in the Portal for "SNAT Connection Count". Fix this by attaching a Managed NAT Gateway or scaling out the outbound IPs on the Load Balancer.
+
+Q: Suppose the Cluster Autoscaler keeps flapping (adding and removing nodes continuously). Why?
+A: This happens when pods have missing or incorrect resource requests vs. limits. They get scheduled (triggering scale-up), run out of resources and get evicted (triggering scale-down), in an infinite loop.
+
+Q: Why are my Prometheus metrics missing from Azure Monitor / Container Insights?
+A: The Azure Monitor agent (AMA) might be failing. Check the ama-logs pods in the kube-system namespace. Ensure your container-azm-ms-agentconfig ConfigMap is valid and configured to scrape your specific endpoints.
+
+Q: How to check if a specific node is dropping network packets due to a full conntrack table?
+A: Use the AKS node shell to SSH into the node and run dmesg | grep conntrack. Look for the error nf_conntrack: table full, dropping packet.
+
+Q: Suppose API server requests from my CI/CD pipeline are randomly timing out. How to check?
+A: The AKS control plane might be overloaded. If you are on the Free tier, you may be getting throttled. Upgrade to the Standard/Premium tier for a dedicated API server and production SLAs. Check API server metrics in Azure Monitor.
+
+Q: Why is my StatefulSet stuck during a rolling update?
+A: StatefulSets update sequentially. If Pod 2 fails to become Ready (due to a failing readiness probe or unmountable PVC), the rollout will pause indefinitely and Pod 1 will never be updated. Check the unready pod.
+
+Q: How do I bypass the kube-proxy and verify if a pod's port is actually open at the networking level?
+A: Exec into the node where the pod is running, find the pod's direct IP (kubectl get pod -o wide), and run curl -v <pod-ip>:<port>.
+
+Q: Suppose I configured an Internal Load Balancer, but Azure assigned it a Public IP. Why?
+A: You are missing the critical Azure annotation. Your Service manifest must include service.beta.kubernetes.io/azure-load-balancer-internal: "true".
+
+Q: Why does my pod's memory usage show higher in Azure Monitor than inside the pod (e.g., using top)?
+A: Azure Monitor and cgroups track the "page cache" (Linux filesystem cache) as part of the container's working set memory. Kubernetes uses this exact working set metric for OOM decisions, making Azure Monitor the more accurate reflection of risk.
+
+Q: How do I check if my Application Gateway Ingress Controller (AGIC) is syncing with AKS?
+A: Check the AGIC pod logs: kubectl logs -n kube-system -l app=ingress-appgw. Look for ARM API throttling limits being hit, or syntax errors in your Ingress manifest that prevent AGIC from parsing the rules.
+
+Q: Suppose cert-manager isn't issuing a Let's Encrypt certificate. How to check?
+A: Follow the dependency chain downward: kubectl get certificate, then kubectl get certificaterequest, then kubectl get order, then kubectl get challenge. Describe whichever object is in a pending or failed state to find the DNS/HTTP01 validation error.
+
+Expert (Kernel, Control Plane, Deep Routing)
+***********************************************
+Q: Why is a MutatingWebhookConfiguration breaking my entire cluster deployments?
+A: A webhook (like OPA Gatekeeper, Datadog, or a Service Mesh) is unreachable or failing, and its failurePolicy is set to Fail. This blocks the API server from writing objects. Delete or edit the webhook configuration to Ignore to restore operations.
+
+Q: How to troubleshoot etcd latency issues on a managed AKS cluster?
+A: Because etcd is managed by Azure, you cannot access it directly. Enable AKS control plane Diagnostic Logs (specifically kube-apiserver) and route them to Log Analytics. Query for slow requests, etcdserver: request timed out, or API latency spikes.
+
+Q: Suppose a node becomes "NotReady" due to PLEG is not healthy. What does this mean?
+A: The Pod Lifecycle Event Generator (PLEG) in the kubelet is blocked. This is almost always caused by a heavily overloaded container runtime or a storage I/O lockup on the OS disk. Check node IOPS utilization in Azure Monitor.
+
+Q: How do I capture a raw network trace (tcpdump) directly on an AKS node?
+A: Spin up a privileged debug container on the node: kubectl debug node/<node-name> -it --image=[mcr.microsoft.com/cbl-mariner/base/core:2.0](https://mcr.microsoft.com/cbl-mariner/base/core:2.0). Install tcpdump and run it on the host network interface, outputting to a mounted host path to retrieve the .pcap file.
+
+Q: Why are iptables or IPVS rules not updating when I create a new service?
+A: kube-proxy is likely failing or looping. Check the kube-proxy pod logs in the kube-system namespace. Excessive rules, stale endpoints, or an inability to reach the API server will stall network routing updates.
+
+Q: Suppose I suspect an asymmetric routing issue between my on-prem ExpressRoute and AKS. How to confirm?
+A: Run a packet capture on both the source on-prem VM and the AKS node. Check the TCP handshake: if the SYN goes directly but the SYN-ACK returns via a different path (like an Azure Firewall), stateful packet inspection will drop the connection.
+
+Q: How do I retrieve the bootstrap logs to see exactly why a new node failed to join the cluster during scale-up?
+A: Navigate to the Virtual Machine Scale Set (VMSS) in the Azure Portal, use the "Run Command" feature, and execute a script to cat /var/log/azure/cluster-provision.log to see the exact bash failure.
+
+Q: Why am I getting "no matches for kind X in version Y" when deploying Helm charts to a newly upgraded AKS cluster?
+A: The Kubernetes API version for that resource was deprecated and permanently removed in the new AKS version (e.g., transitioning from v1beta1 to v1 for Ingress). You must update the Helm chart manifests to the currently supported API versions.
+
+Q: Suppose ephemeral port exhaustion is happening at the Node OS level for a high-throughput outbound app. How to fix it?
+A: Check /proc/sys/net/ipv4/ip_local_port_range. To fix it across the cluster, use kubeletConfig and linuxOSConfig parameters in your AKS Node Pool configuration to tune sysctls natively, rather than using privileged DaemonSets.
+
+Q: How do I diagnose Azure CNI Overlay issues where pods cannot reach other pods on different nodes?
+A: Check if the routing table inside the Node OS (ip route) has the correct next-hop for the pod CIDRs via the overlay interface. Then, verify that UDP port 4789 (VXLAN) is not being blocked by Network Security Groups (NSGs) between the node pools.
