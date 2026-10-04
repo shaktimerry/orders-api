@@ -1,10 +1,13 @@
 Basic (Pods, Nodes, & Deployments)
 ********************************************
 Q: Why is a Pod stuck in the Pending state?
-A: The Kubernetes scheduler cannot find a node to host the pod. This is usually due to insufficient CPU/memory resources on nodes, unmatched node selectors/taints, or an unprovisioned PersistentVolumeClaim (PVC). Check: kubectl describe pod <pod-name>.
+A: The Kubernetes scheduler cannot find a node to host the pod. 
+This is usually due to insufficient CPU/memory resources on nodes, 
+unmatched node selectors/taints, or an unprovisioned PersistentVolumeClaim (PVC). Check: kubectl describe pod <pod-name>.
 
 Q: How do I find out why a Pod is in CrashLoopBackOff?
-A: The application inside the container is failing to start or crashing repeatedly. Check the logs of the previous crashed instance: kubectl logs <pod-name> --previous, then check events: kubectl describe pod <pod-name>.
+A: The application inside the container is failing to start or crashing repeatedly. 
+Check the logs of the previous crashed instance: kubectl logs <pod-name> --previous, then check events: kubectl describe pod <pod-name>.
 
 Q: Suppose a Node status is NotReady. How to check?
 A: The kubelet daemon stopped communicating with the API server. Check: kubectl describe node <node-name>. For deeper diagnostics, use the AKS node shell (kubectl debug node/<node-name> -it --image=[mcr.microsoft.com/cbl-mariner/base/core:2.0](https://mcr.microsoft.com/cbl-mariner/base/core:2.0)) and run journalctl -u kubelet.
