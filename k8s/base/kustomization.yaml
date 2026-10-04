@@ -1,0 +1,29 @@
+//Instead of applying 15 YAML use Kustomization//
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: orders-prod
+
+resources:
+
+- namespace.yaml
+- serviceaccount.yaml
+- configmap.yaml
+- secretproviderclass.yaml
+- deployment.yaml
+- service.yaml
+- ingress.yaml
+- networkpolicy.yaml
+- resourcequota.yaml
+- limitrange.yaml
+- pdb.yaml
+- hpa.yaml
+- topology.yaml
+- migration-job.yaml
+- cronjob.yaml
+- priorityclass.yaml
+
+Then kubectl apply -k k8s/base/
+
+But don't put same YAML to Dev QA Prod. This is where Overlays comes to scene with Patches.

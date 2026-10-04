@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: orders-db-migration
+  namespace: orders-prod
+
+spec:
+
+  backoffLimit: 3
+
+  template:
+
+    metadata:
+      labels:
+        app: orders-db-migration
+
+    spec:
+
+      restartPolicy: Never
+
+      serviceAccountName: orders-api-sa
+
+      containers:
+
+      - name: migration
+
+        image: myacr.azurecr.io/orders-api:1.0.25
+
+        command:
+
+        - /app/migrate
+
+        envFrom:
+
+        - configMapRef:
+            name: orders-api-config
+
+        volumeMounts:
+
+        - name: kv-secrets
+          mountPath: /mnt/secrets-store
+          readOnly: true
+
+      volumes:
+
+      - name: kv-secrets
+
+        csi:
+          driver: secrets-store.csi.k8s.io
+
+          readOnly: true
+
+          volumeAttributes:
+            secretProviderClass: orders-api-kv

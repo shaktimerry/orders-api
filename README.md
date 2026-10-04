@@ -55,3 +55,5 @@ Pod ──Workload Identity──► Key Vault
                            ├── DB_USERNAME
                            ├── DB_PASSWORD
                            └── API_KEY
+
+Important: NetworkPolicy support depends on your AKS networking/policy implementation. Microsoft currently recommends Cilium Network Policy for new deployments rather than Azure Network Policy Manager, which is scheduled for retirement on September 30, 2028.
