@@ -1,0 +1,76 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: orders-api-policy
+  namespace: orders-prod
+
+spec:
+
+  podSelector:
+    matchLabels:
+      app: orders-api
+
+  policyTypes:
+  - Ingress
+  - Egress
+
+  ingress:
+
+  # Allow traffic from ingress controller
+  - from:
+
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: app-routing-system
+
+    ports:
+
+    - protocol: TCP
+      port: 8080
+
+  # Allow monitoring
+  - from:
+
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+
+    ports:
+
+    - protocol: TCP
+      port: 8080
+
+  egress:
+
+  # DNS
+  - to:
+
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+
+    ports:
+
+    - protocol: UDP
+      port: 53
+
+    - protocol: TCP
+      port: 53
+
+  # PostgreSQL
+  - to:
+
+    - ipBlock:
+        cidr: 10.50.20.10/32
+
+    ports:
+
+    - protocol: TCP
+      port: 5432
+
+  # HTTPS to Azure services
+  - ports:
+
+    - protocol: TCP
+      port: 443
