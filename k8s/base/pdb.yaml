@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+
+metadata:
+  name: orders-api-pdb
+  namespace: orders-prod
+
+spec:
+
+  minAvailable: 2
+
+  selector:
+
+    matchLabels:
+      app: orders-api
