@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: orders-api
+  namespace: orders-prod
+
+  labels:
+    app: orders-api
+    environment: production
+
+spec:
+
+  replicas: 3
+
+  revisionHistoryLimit: 5
+
+  strategy:
+    type: RollingUpdate
+
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  selector:
+    matchLabels:
+      app: orders-api
+
+  template:
+
+    metadata:
+
+      labels:
+        app: orders-api
+        environment: production
+
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+
+    spec:
+
+      serviceAccountName: orders-api-sa
+
+      terminationGracePeriodSeconds: 30
+
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+
+      - name: orders-api
+
+        image: myacr.azurecr.io/orders-api:1.0.25
+
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - name: http
+          containerPort: 8080
+
+        envFrom:
+        - configMapRef:
+            name: orders-api-config
+
+        volumeMounts:
+
+        - name: kv-secrets
+          mountPath: /mnt/secrets-store
+          readOnly: true
+
+        resources:
+
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+
+        startupProbe:
+
+          httpGet:
+            path: /health/startup
+            port: http
+
+          failureThreshold: 30
+          periodSeconds: 10
+
+        readinessProbe:
+
+          httpGet:
+            path: /health/ready
+            port: http
+
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        livenessProbe:
+
+          httpGet:
+            path: /health/live
+            port: http
+
+          initialDelaySeconds: 30
+          periodSeconds: 20
+
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        securityContext:
+
+          allowPrivilegeEscalation: false
+
+          capabilities:
+            drop:
+            - ALL
+
+      volumes:
+
+      - name: kv-secrets
+
+        csi:
+          driver: secrets-store.csi.k8s.io
+
+          readOnly: true
+
+          volumeAttributes:
+            secretProviderClass: orders-api-kv
